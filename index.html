@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Vales Profesionales</title>
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.0/dist/JsBarcode.all.min.js"></script>
+    <style>
+        :root { --primary: #2563eb; --success: #16a34a; --danger: #dc2626; --dark: #1e293b; --bg: #f8fafc; --gray: #94a3b8; }
+        body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background: var(--bg); margin: 0; padding: 15px; color: var(--dark); }
+        .container { max-width: 500px; margin: auto; }
+        
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; border: 1px solid #e2e8f0; }
+        h2 { margin-top: 0; font-size: 1.1rem; border-bottom: 2px solid #f1f5f9; padding-bottom: 10px; margin-bottom: 15px; display: flex; align-items: center; gap: 8px; }
+
+        .input-group { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+        label { font-size: 0.7rem; font-weight: 800; color: #64748b; text-transform: uppercase; }
+        input, select { padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 1rem; width: 100%; box-sizing: border-box; }
+        
+        .btn { cursor: pointer; border: none; border-radius: 8px; padding: 12px; font-weight: 700; transition: 0.2s; color: white; width: 100%; text-transform: uppercase; letter-spacing: 0.5px; }
+        .btn-add { background: var(--dark); margin-top: 5px; }
+        .btn-generate { background: var(--primary); margin-top: 15px; font-size: 0.9rem; }
+        
+        .vale-item { 
+            background: white; border: 1px solid #e2e8f0; padding: 15px; border-radius: 10px; 
+            margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;
+        }
+        .vale-item.locked { background: #f8fafc; opacity: 0.6; border: 1px dashed #cbd5e1; }
+        .vale-info b { font-size: 1.4rem; color: var(--dark); display: block; }
+        .vale-info span { font-size: 0.8rem; color: #64748b; font-family: monospace; }
+
+        .btn-send-wa { background: #25d366; width: auto; padding: 8px 12px; font-size: 0.75rem; }
+        .btn-send-wa:disabled { background: var(--gray); }
+
+        #modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.95); justify-content: center; align-items: center; padding: 20px; z-index: 100; }
+        .modal-content { background: white; padding: 25px; border-radius: 20px; text-align: center; width: 100%; max-width: 350px; }
+        #barcode { width: 100%; height: auto; margin: 15px 0; }
+        
+        .badge-locked { background: #fee2e2; color: #991b1b; padding: 3px 8px; border-radius: 5px; font-size: 0.65rem; font-weight: 800; margin-top: 5px; display: inline-block; }
+        .hidden { display: none; }
+        
+        #queue-preview { margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px; }
+        .queue-row { font-size: 0.8rem; display: flex; justify-content: space-between; padding: 4px 0; color: #475569; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="admin-panel">
+        <div class="card">
+            <h2>⛽ Generar Paquete</h2>
+            <div class="input-group">
+                <label>Nombre Gasolinera</label>
+                <input type="text" id="st-name" placeholder="Ej: Cepsa Central">
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div class="input-group">
+                    <label>Código</label>
+                    <input type="text" id="v-code" placeholder="123456">
+                </div>
+                <div class="input-group">
+                    <label>Importe (€)</label>
+                    <input type="number" id="v-amount" placeholder="20">
+                </div>
+            </div>
+            <button class="btn btn-add" onclick="addToQueue()">+ Añadir Vale</button>
+
+            <div id="queue-section" class="hidden">
+                <div id="queue-preview"></div>
+                <button class="btn btn-generate" onclick="generateFinalLink()">Copiar Enlace para Cliente</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="client-panel" class="hidden">
+        <div class="card">
+            <h2 id="client-station-title">Cargando...</h2>
+            <div id="client-vales-list"></div>
+        </div>
+    </div>
+</div>
+
+<div id="modal" onclick="closeModal()">
+    <div class="modal-content" onclick="event.stopPropagation()">
+        <h2 id="modal-amount"></h2>
+        <svg id="barcode"></svg>
+        <div id="modal-code-text" style="font-weight: bold; letter-spacing: 2px;"></div>
+        <button class="btn" onclick="closeModal()" style="background:var(--dark); margin-top:20px;">CERRAR</button>
+    </div>
+</div>
+
+<script>
+    let queue = [];
+    const params = new URLSearchParams(window.location.search);
+    const d = params.get('d');
+
+    // Función de codificación segura para tildes y caracteres especiales
+    function encodeData(obj) {
+        return btoa(encodeURIComponent(JSON.stringify(obj)).replace(/%([0-9A-F]{2})/g, (match, p1) => String.fromCharCode('0x' + p1)));
+    }
+
+    // Función de decodificación segura
+    function decodeData(str) {
+        return JSON.parse(decodeURIComponent(atob(str).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')));
+    }
+
+    window.onload = () => {
+        if (d) {
+            document.getElementById('admin-panel').classList.add('hidden');
+            document.getElementById('client-panel').classList.remove('hidden');
+            renderClientView();
+        }
+    };
+
+    function addToQueue() {
+        const code = document.getElementById('v-code').value.trim();
+        const amount = document.getElementById('v-amount').value.trim();
+        if(!code || !amount) return alert("Escribe código e importe");
+
+        queue.push({ id: code, am: amount });
+        document.getElementById('queue-section').classList.remove('hidden');
+        document.getElementById('queue-preview').innerHTML += `<div class="queue-row"><span>Vale ${amount}€</span> <span>#${code}</span></div>`;
+        
+        document.getElementById('v-code').value = '';
+        document.getElementById('v-amount').value = '';
+    }
+
+    function generateFinalLink() {
+        const station = document.getElementById('st-name').value.trim() || "Gasolinera";
+        const base64 = encodeData({ s: station, v: queue });
+        const url = window.location.origin + window.location.pathname + '?d=' + base64;
+        
+        const msg = `⛽ *VALES DE COMBUSTIBLE*\nEstación: *${station}*\n\nAccede aquí para repartir los vales a tus socios:\n${url}`;
+        
+        navigator.clipboard.writeText(msg).then(() => alert("¡Mensaje copiado! Pégalo en WhatsApp."));
+    }
+
+    function renderClientView() {
+        try {
+            const decoded = decodeData(d);
+            document.getElementById('client-station-title').innerText = "⛽ " + decoded.s;
+            
+            const lockKey = 'lock_' + btoa(decoded.s).substring(0,8);
+            const locked = JSON.parse(localStorage.getItem(lockKey)) || [];
+            
+            const list = document.getElementById('client-vales-list');
+            list.innerHTML = '';
+
+            decoded.v.forEach(v => {
+                const isLocked = locked.includes(v.id);
+                const item = document.createElement('div');
+                item.className = `vale-item ${isLocked ? 'locked' : ''}`;
+                item.innerHTML = `
+                    <div class="vale-info" onclick="${!isLocked ? `viewBarcode('${v.id}','${v.am}')` : ''}">
+                        <b>${v.am} €</b>
+                        <span>Código: ${v.id}</span>
+                        ${isLocked ? '<span class="badge-locked">ENVIADO / USADO</span>' : ''}
+                    </div>
+                    <button class="btn btn-send-wa" ${isLocked ? 'disabled' : ''} 
+                        onclick="sendToPartner('${v.id}','${v.am}','${decoded.s}','${lockKey}')">
+                        ${isLocked ? 'LISTO' : 'ENVIAR'}
+                    </button>
+                `;
+                list.appendChild(item);
+            });
+        } catch(e) { alert("Error al abrir el paquete. El enlace podría estar incompleto."); }
+    }
+
+    function sendToPartner(id, am, station, lockKey) {
+        const msg = `*VALE DE COMBUSTIBLE* ⛽\n📍 Estación: ${station}\n💰 Importe: ${am}€\n🔢 Código: ${id}\n\nPresente este mensaje en caja.`;
+        window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+
+        let locked = JSON.parse(localStorage.getItem(lockKey)) || [];
+        if(!locked.includes(id)) {
+            locked.push(id);
+            localStorage.setItem(lockKey, JSON.stringify(locked));
+        }
+        setTimeout(renderClientView, 1000);
+    }
+
+    function viewBarcode(id, am) {
+        document.getElementById('modal').style.display = 'flex';
+        document.getElementById('modal-amount').innerText = am + " €";
+        document.getElementById('modal-code-text').innerText = id;
+        JsBarcode("#barcode", id, { format: "CODE128", width: 2.5, height: 80, displayValue: false });
+    }
+
+    function closeModal() { document.getElementById('modal').style.display = 'none'; }
+</script>
+
+</body>
+</html>
