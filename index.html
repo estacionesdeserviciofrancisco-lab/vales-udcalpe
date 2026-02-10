@@ -3,42 +3,63 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sistema de Vales - Gasolinera</title>
+    <title>Gestor de Vales</title>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.0/dist/JsBarcode.all.min.js"></script>
     <style>
-        :root { --primary: #2563eb; --success: #16a34a; --danger: #dc2626; --dark: #1e293b; --bg: #f8fafc; }
-        body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); margin: 0; padding: 15px; color: var(--dark); }
-        .container { max-width: 500px; margin: auto; }
-        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; border: 1px solid #e2e8f0; position: relative; }
+        :root { --primary: #2563eb; --danger: #ef4444; --dark: #1e293b; --bg: #f1f5f9; }
+        body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); margin: 0; padding: 15px; }
+        .container { max-width: 450px; margin: auto; }
         
-        h2 { margin-top: 0; font-size: 1.1rem; border-bottom: 2px solid #f1f5f9; padding-bottom: 10px; margin-bottom: 15px; }
+        .card { background: white; padding: 20px; border-radius: 16px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); margin-bottom: 20px; border: 1px solid #e2e8f0; }
+        h2 { margin: 0 0 15px 0; font-size: 1.2rem; color: var(--dark); border-bottom: 2px solid #eee; padding-bottom: 10px; }
 
+        /* Formulario */
         .input-group { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
-        label { font-size: 0.7rem; font-weight: 800; color: #64748b; text-transform: uppercase; }
-        input { padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 1rem; width: 100%; box-sizing: border-box; }
+        label { font-size: 0.75rem; font-weight: 800; color: #64748b; text-transform: uppercase; }
+        input { padding: 14px; border: 1px solid #cbd5e1; border-radius: 10px; font-size: 1rem; width: 100%; box-sizing: border-box; }
         
-        .btn { cursor: pointer; border: none; border-radius: 8px; padding: 12px; font-weight: 700; transition: 0.2s; color: white; width: 100%; text-transform: uppercase; }
-        .btn-add { background: var(--dark); }
-        .btn-generate { background: var(--primary); margin-top: 15px; }
-        .btn-clear { background: var(--danger); font-size: 0.7rem; padding: 5px 10px; width: auto; position: absolute; top: 18px; right: 20px; }
+        /* Botones principales */
+        .btn { cursor: pointer; border: none; border-radius: 10px; padding: 14px; font-weight: 700; color: white; width: 100%; text-transform: uppercase; }
+        .btn-add { background: var(--dark); margin-bottom: 10px; }
+        .btn-generate { background: var(--primary); margin-top: 10px; }
         
-        /* Lista Admin */
-        .queue-item { display: flex; justify-content: space-between; align-items: center; background: #f8fafc; padding: 8px 12px; border-radius: 6px; margin-bottom: 5px; font-size: 0.85rem; border: 1px solid #e2e8f0; }
-        .btn-del { background: none; color: var(--danger); font-weight: bold; font-size: 1.1rem; cursor: pointer; border: none; padding: 0 5px; }
+        /* LISTA DE TARJETAS EN CREACIÓN (ADMIN) */
+        .admin-list-item { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            background: #fff; 
+            border: 2px solid #e2e8f0; 
+            padding: 12px; 
+            border-radius: 12px; 
+            margin-bottom: 8px;
+        }
+        .admin-list-info { display: flex; flex-direction: column; }
+        .admin-list-info b { font-size: 1.1rem; color: var(--dark); }
+        .admin-list-info span { font-size: 0.8rem; color: #64748b; }
+        
+        /* BOTÓN ELIMINAR (EL QUE NECESITAS) */
+        .btn-delete-card { 
+            background: var(--danger); 
+            color: white; 
+            border: none; 
+            padding: 8px 12px; 
+            border-radius: 8px; 
+            font-weight: bold; 
+            cursor: pointer;
+            font-size: 0.75rem;
+        }
 
-        /* Estilos Vales Cliente */
-        .vale-item { background: white; border: 1px solid #e2e8f0; padding: 15px; border-radius: 10px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
-        .vale-item.locked { background: #f1f5f9; opacity: 0.6; border-style: dashed; }
-        .vale-info b { font-size: 1.4rem; color: var(--primary); display: block; }
-
+        /* Estilos Distribuidor */
+        .vale-item { background: white; border: 1px solid #e2e8f0; padding: 15px; border-radius: 12px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
+        .vale-item.locked { opacity: 0.5; filter: grayscale(1); }
         .btn-send-wa { background: #25d366; width: auto; padding: 10px 15px; font-size: 0.8rem; }
-        .btn-send-wa:disabled { background: #94a3b8; }
 
-        /* Pantalla Ticket Final */
-        #ticket-view { display: none; text-align: center; background: white; min-height: 100vh; padding: 40px 20px; box-sizing: border-box; }
-        #barcode-full { width: 100%; max-width: 400px; height: auto; margin: 30px 0; }
-        .ticket-amount { font-size: 4rem; font-weight: 900; margin: 0; }
-        
+        /* Ticket Final */
+        #ticket-view { display: none; text-align: center; background: white; min-height: 100vh; padding: 40px 20px; }
+        .ticket-amount { font-size: 4.5rem; font-weight: 900; margin: 10px 0; }
+        #barcode-full { width: 100%; max-width: 400px; }
+
         .hidden { display: none !important; }
     </style>
 </head>
@@ -47,30 +68,21 @@
 <div id="main-app" class="container">
     <div id="admin-panel">
         <div class="card">
-            <h2>⛽ Configurar Paquete</h2>
-            <button class="btn btn-clear hidden" id="btn-clear-all" onclick="clearQueue()">Limpiar Todo</button>
-            
+            <h2>⛽ Crear Vales</h2>
             <div class="input-group">
-                <label>Nombre de la Estación</label>
-                <input type="text" id="st-name" placeholder="Ej: Repsol Local">
+                <label>Estación</label>
+                <input type="text" id="st-name" placeholder="Ej: Repsol">
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                <div class="input-group">
-                    <label>Código</label>
-                    <input type="text" id="v-code" placeholder="12345678">
-                </div>
-                <div class="input-group">
-                    <label>Importe (€)</label>
-                    <input type="number" id="v-amount" placeholder="20">
-                </div>
+                <div class="input-group"><label>Código</label><input type="text" id="v-code" placeholder="000000"></div>
+                <div class="input-group"><label>Importe €</label><input type="number" id="v-amount" placeholder="0"></div>
             </div>
-            <button class="btn btn-add" onclick="addToQueue()">+ Añadir Vale</button>
+            <button class="btn btn-add" onclick="addToQueue()">+ AÑADIR TARJETA</button>
             
             <div id="queue-section" class="hidden">
-                <hr style="margin:20px 0; border:0; border-top:1px solid #eee;">
-                <label id="count-label" style="margin-bottom:10px; display:block"></label>
+                <h3 style="font-size: 0.8rem; color: #64748b; text-transform: uppercase;">Tarjetas en la lista:</h3>
                 <div id="queue-list"></div>
-                <button class="btn btn-generate" onclick="generateFinalLink()">Generar Enlace Distribuidor</button>
+                <button class="btn btn-generate" onclick="generateFinalLink()">GENERAR Y COPIAR ENLACE</button>
             </div>
         </div>
     </div>
@@ -87,16 +99,17 @@
     <p id="ticket-station" style="text-transform: uppercase; font-weight: bold; color: #64748b;"></p>
     <h1 class="ticket-amount" id="ticket-amount"></h1>
     <svg id="barcode-full"></svg>
-    <div id="ticket-code-num" style="letter-spacing: 5px; font-weight: bold; font-size: 1.3rem;"></div>
-    <p style="margin-top: 50px; color: #94a3b8; font-size: 0.8rem;">Presente este código en caja.</p>
+    <div id="ticket-code-num" style="letter-spacing: 5px; font-weight: bold; font-size: 1.4rem;"></div>
+    <p style="margin-top: 40px; color: #94a3b8; font-size: 0.8rem;">Escanee este código en caja.</p>
 </div>
 
 <script>
     let queue = [];
-    const params = new URLSearchParams(window.location.search);
-    const d = params.get('d');
-    const s = params.get('s');
+    const urlParams = new URLSearchParams(window.location.search);
+    const dParam = urlParams.get('d');
+    const sParam = urlParams.get('s');
 
+    // Codificación robusta
     function encodeData(obj) {
         return btoa(encodeURIComponent(JSON.stringify(obj)).replace(/%([0-9A-F]{2})/g, (match, p1) => String.fromCharCode('0x' + p1)));
     }
@@ -105,118 +118,102 @@
     }
 
     window.onload = () => {
-        if (s) { showTicketView(); } 
-        else if (d) {
+        if (sParam) { showTicketView(); } 
+        else if (dParam) {
             document.getElementById('admin-panel').classList.add('hidden');
             document.getElementById('client-panel').classList.remove('hidden');
             renderClientView();
         }
     };
 
-    // --- FUNCIONES ADMIN ---
+    // --- FUNCIONES DEL ADMINISTRADOR ---
     function addToQueue() {
         const code = document.getElementById('v-code').value.trim();
         const amount = document.getElementById('v-amount').value.trim();
-        if(!code || !amount) return alert("Faltan datos");
+        if(!code || !amount) return alert("Escribe código e importe");
         
         queue.push({ id: code, am: amount });
         updateAdminList();
         
         document.getElementById('v-code').value = '';
         document.getElementById('v-amount').value = '';
-        document.getElementById('v-code').focus();
     }
 
-    function removeOne(index) {
+    // ELIMINAR TARJETA DE LA LISTA
+    function removeCard(index) {
         queue.splice(index, 1);
         updateAdminList();
-    }
-
-    function clearQueue() {
-        if(confirm("¿Borrar todos los vales de la lista?")) {
-            queue = [];
-            updateAdminList();
-        }
     }
 
     function updateAdminList() {
         const section = document.getElementById('queue-section');
         const listDiv = document.getElementById('queue-list');
-        const clearBtn = document.getElementById('btn-clear-all');
-        const countLabel = document.getElementById('count-label');
-
+        
         if(queue.length === 0) {
             section.classList.add('hidden');
-            clearBtn.classList.add('hidden');
             return;
         }
 
         section.classList.remove('hidden');
-        clearBtn.classList.remove('hidden');
-        countLabel.innerText = `Vales en el paquete: ${queue.length}`;
-        
         listDiv.innerHTML = queue.map((v, i) => `
-            <div class="queue-item">
-                <span><b>${v.am}€</b> - Cód: ${v.id}</span>
-                <button class="btn-del" onclick="removeOne(${i})">✕</button>
+            <div class="admin-list-item">
+                <div class="admin-list-info">
+                    <b>${v.am}€</b>
+                    <span>Cód: ${v.id}</span>
+                </div>
+                <button class="btn-delete-card" onclick="removeCard(${i})">ELIMINAR</button>
             </div>
         `).join('');
     }
 
     function generateFinalLink() {
         const station = document.getElementById('st-name').value.trim() || "Gasolinera";
-        const base64 = encodeData({ s: station, v: queue });
-        const url = window.location.origin + window.location.pathname + '?d=' + base64;
-        const msg = `⛽ *PAQUETE DE VALES*\nEstación: *${station}*\n\nAccede aquí para repartirlos:\n${url}`;
-        navigator.clipboard.writeText(msg).then(() => alert("¡Mensaje copiado!"));
+        const b64 = encodeData({ s: station, v: queue });
+        const finalUrl = window.location.origin + window.location.pathname + '?d=' + b64;
+        const msg = `⛽ *VALES DISPONIBLES*\nEstación: *${station}*\n\nEnlace de gestión:\n${finalUrl}`;
+        navigator.clipboard.writeText(msg).then(() => alert("¡Enlace copiado!"));
     }
 
     // --- FUNCIONES CLIENTE / SOCIO ---
     function renderClientView() {
-        const decoded = decodeData(d);
-        document.getElementById('client-station-title').innerText = "📍 " + decoded.s;
-        const lockKey = 'lock_' + btoa(decoded.s).substring(0,8);
+        const data = decodeData(dParam);
+        document.getElementById('client-station-title').innerText = "📍 " + data.s;
+        const lockKey = 'lk_' + btoa(data.s).substring(0,6);
         const locked = JSON.parse(localStorage.getItem(lockKey)) || [];
         const list = document.getElementById('client-vales-list');
-        list.innerHTML = decoded.v.map(v => {
+        
+        list.innerHTML = data.v.map(v => {
             const isLocked = locked.includes(v.id);
             return `
-                <div class="vale-item ${isLocked ? 'locked' : ''}">
-                    <div class="vale-info"><b>${v.am} €</b><small>ID: ${v.id}</small></div>
-                    <button class="btn btn-send-wa" ${isLocked ? 'disabled' : ''} onclick="sendToPartner('${v.id}','${v.am}','${decoded.s}','${lockKey}')">
-                        ${isLocked ? 'ENVIADO' : 'ENVIAR WA'}
-                    </button>
-                </div>
-            `;
+            <div class="vale-item ${isLocked ? 'locked' : ''}">
+                <div class="vale-info"><b>${v.am} €</b><small>ID: ${v.id}</small></div>
+                <button class="btn btn-send-wa" ${isLocked ? 'disabled' : ''} onclick="sendToPartner('${v.id}','${v.am}','${data.s}','${lockKey}')">
+                    ${isLocked ? 'ENVIADO' : 'ENVIAR'}
+                </button>
+            </div>`;
         }).join('');
     }
 
     function sendToPartner(id, am, station, lockKey) {
-        const socioData = encodeData({ i: id, a: am, st: station });
-        const urlSocio = window.location.origin + window.location.pathname + '?s=' + socioData;
-        const msg = `*VALE DE COMBUSTIBLE* ⛽\n📍 Estación: *${station}*\n💰 Importe: *${am}€*\n\n👇 *PULSA PARA VER TU CÓDIGO:* \n${urlSocio}\n\n⚠️ Si el enlace no sale azul, responde "OK" para activarlo.`;
+        const sData = encodeData({ i: id, a: am, st: station });
+        const urlSocio = window.location.origin + window.location.pathname + '?s=' + sData;
+        const msg = `⛽ *VALE COMBUSTIBLE*\nImporte: *${am}€*\n\n👇 *VER CÓDIGO:* \n${urlSocio}\n\n⚠️ Si el link sale negro, respóndeme "OK".`;
         window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
 
         let locked = JSON.parse(localStorage.getItem(lockKey)) || [];
-        if(!locked.includes(id)) {
-            locked.push(id);
-            localStorage.setItem(lockKey, JSON.stringify(locked));
-        }
-        setTimeout(renderClientView, 1000);
+        if(!locked.includes(id)) { locked.push(id); localStorage.setItem(lockKey, JSON.stringify(locked)); }
+        setTimeout(renderClientView, 800);
     }
 
     function showTicketView() {
         document.getElementById('main-app').classList.add('hidden');
         document.getElementById('ticket-view').style.display = 'block';
-        try {
-            const data = decodeData(s);
-            document.getElementById('ticket-station').innerText = data.st;
-            document.getElementById('ticket-amount').innerText = data.a + "€";
-            document.getElementById('ticket-code-num').innerText = data.i;
-            JsBarcode("#barcode-full", data.i, { format: "CODE128", width: 3.5, height: 140, displayValue: false });
-        } catch(e) { alert("Error"); }
+        const data = decodeData(sParam);
+        document.getElementById('ticket-station').innerText = data.st;
+        document.getElementById('ticket-amount').innerText = data.a + "€";
+        document.getElementById('ticket-code-num').innerText = data.i;
+        JsBarcode("#barcode-full", data.i, { format: "CODE128", width: 3, height: 130, displayValue: false });
     }
 </script>
-
 </body>
 </html>
