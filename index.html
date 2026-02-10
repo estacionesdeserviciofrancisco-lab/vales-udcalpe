@@ -6,10 +6,10 @@
     <title>Sistema de Vales - Gasolinera</title>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.0/dist/JsBarcode.all.min.js"></script>
     <style>
-        :root { --primary: #2563eb; --success: #16a34a; --dark: #1e293b; --bg: #f8fafc; }
+        :root { --primary: #2563eb; --success: #16a34a; --danger: #dc2626; --dark: #1e293b; --bg: #f8fafc; }
         body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); margin: 0; padding: 15px; color: var(--dark); }
         .container { max-width: 500px; margin: auto; }
-        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; border: 1px solid #e2e8f0; }
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; border: 1px solid #e2e8f0; position: relative; }
         
         h2 { margin-top: 0; font-size: 1.1rem; border-bottom: 2px solid #f1f5f9; padding-bottom: 10px; margin-bottom: 15px; }
 
@@ -20,21 +20,26 @@
         .btn { cursor: pointer; border: none; border-radius: 8px; padding: 12px; font-weight: 700; transition: 0.2s; color: white; width: 100%; text-transform: uppercase; }
         .btn-add { background: var(--dark); }
         .btn-generate { background: var(--primary); margin-top: 15px; }
+        .btn-clear { background: var(--danger); font-size: 0.7rem; padding: 5px 10px; width: auto; position: absolute; top: 18px; right: 20px; }
         
+        /* Lista Admin */
+        .queue-item { display: flex; justify-content: space-between; align-items: center; background: #f8fafc; padding: 8px 12px; border-radius: 6px; margin-bottom: 5px; font-size: 0.85rem; border: 1px solid #e2e8f0; }
+        .btn-del { background: none; color: var(--danger); font-weight: bold; font-size: 1.1rem; cursor: pointer; border: none; padding: 0 5px; }
+
+        /* Estilos Vales Cliente */
         .vale-item { background: white; border: 1px solid #e2e8f0; padding: 15px; border-radius: 10px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
         .vale-item.locked { background: #f1f5f9; opacity: 0.6; border-style: dashed; }
         .vale-info b { font-size: 1.4rem; color: var(--primary); display: block; }
-        .vale-info small { color: #64748b; font-family: monospace; }
 
         .btn-send-wa { background: #25d366; width: auto; padding: 10px 15px; font-size: 0.8rem; }
         .btn-send-wa:disabled { background: #94a3b8; }
 
+        /* Pantalla Ticket Final */
         #ticket-view { display: none; text-align: center; background: white; min-height: 100vh; padding: 40px 20px; box-sizing: border-box; }
         #barcode-full { width: 100%; max-width: 400px; height: auto; margin: 30px 0; }
-        .ticket-amount { font-size: 4rem; font-weight: 900; margin: 0; color: #000; }
+        .ticket-amount { font-size: 4rem; font-weight: 900; margin: 0; }
         
         .hidden { display: none !important; }
-        .badge-locked { background: #fee2e2; color: #991b1b; padding: 3px 8px; border-radius: 5px; font-size: 0.65rem; font-weight: 800; margin-top: 5px; display: inline-block; }
     </style>
 </head>
 <body>
@@ -42,10 +47,12 @@
 <div id="main-app" class="container">
     <div id="admin-panel">
         <div class="card">
-            <h2>⚙️ Configurar Paquete de Vales</h2>
+            <h2>⛽ Configurar Paquete</h2>
+            <button class="btn btn-clear hidden" id="btn-clear-all" onclick="clearQueue()">Limpiar Todo</button>
+            
             <div class="input-group">
                 <label>Nombre de la Estación</label>
-                <input type="text" id="st-name" placeholder="Ej: Repsol Central">
+                <input type="text" id="st-name" placeholder="Ej: Repsol Local">
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                 <div class="input-group">
@@ -57,10 +64,12 @@
                     <input type="number" id="v-amount" placeholder="20">
                 </div>
             </div>
-            <button class="btn btn-add" onclick="addToQueue()">+ Añadir a la lista</button>
+            <button class="btn btn-add" onclick="addToQueue()">+ Añadir Vale</button>
             
             <div id="queue-section" class="hidden">
-                <div id="queue-preview" style="margin-top:15px; font-size:0.8rem; color:#64748b;"></div>
+                <hr style="margin:20px 0; border:0; border-top:1px solid #eee;">
+                <label id="count-label" style="margin-bottom:10px; display:block"></label>
+                <div id="queue-list"></div>
                 <button class="btn btn-generate" onclick="generateFinalLink()">Generar Enlace Distribuidor</button>
             </div>
         </div>
@@ -69,28 +78,25 @@
     <div id="client-panel" class="hidden">
         <div class="card">
             <h2 id="client-station-title">Mis Vales</h2>
-            <p style="font-size: 0.8rem; color: #64748b; margin-bottom: 15px;">Pulsa "ENVIAR" para repartir cada vale. Se bloquearán automáticamente al enviarlos.</p>
             <div id="client-vales-list"></div>
         </div>
     </div>
 </div>
 
 <div id="ticket-view">
-    <p id="ticket-station" style="text-transform: uppercase; font-weight: bold; color: #64748b; letter-spacing: 1px;"></p>
-    <p style="margin:0; color:#64748b; font-size: 0.9rem;">VALE DE COMBUSTIBLE</p>
+    <p id="ticket-station" style="text-transform: uppercase; font-weight: bold; color: #64748b;"></p>
     <h1 class="ticket-amount" id="ticket-amount"></h1>
     <svg id="barcode-full"></svg>
-    <div id="ticket-code-num" style="letter-spacing: 5px; font-weight: bold; font-size: 1.3rem; margin-bottom: 10px;"></div>
-    <p style="margin-top: 40px; color: #94a3b8; font-size: 0.85rem; padding: 0 20px;">Presente este código en el lector de la caja para aplicar su descuento.</p>
+    <div id="ticket-code-num" style="letter-spacing: 5px; font-weight: bold; font-size: 1.3rem;"></div>
+    <p style="margin-top: 50px; color: #94a3b8; font-size: 0.8rem;">Presente este código en caja.</p>
 </div>
 
 <script>
     let queue = [];
     const params = new URLSearchParams(window.location.search);
-    const d = params.get('d'); // Datos del paquete
-    const s = params.get('s'); // Datos del socio individual
+    const d = params.get('d');
+    const s = params.get('s');
 
-    // Decodificación y codificación segura (UTF-8 y Base64)
     function encodeData(obj) {
         return btoa(encodeURIComponent(JSON.stringify(obj)).replace(/%([0-9A-F]{2})/g, (match, p1) => String.fromCharCode('0x' + p1)));
     }
@@ -99,78 +105,96 @@
     }
 
     window.onload = () => {
-        if (s) {
-            showTicketView();
-        } else if (d) {
+        if (s) { showTicketView(); } 
+        else if (d) {
             document.getElementById('admin-panel').classList.add('hidden');
             document.getElementById('client-panel').classList.remove('hidden');
             renderClientView();
         }
     };
 
+    // --- FUNCIONES ADMIN ---
     function addToQueue() {
         const code = document.getElementById('v-code').value.trim();
         const amount = document.getElementById('v-amount').value.trim();
-        if(!code || !amount) return alert("Completa código e importe");
+        if(!code || !amount) return alert("Faltan datos");
         
         queue.push({ id: code, am: amount });
-        document.getElementById('queue-section').classList.remove('hidden');
-        document.getElementById('queue-preview').innerHTML += `<div>• Vale ${amount}€ (Cód: ${code})</div>`;
+        updateAdminList();
+        
         document.getElementById('v-code').value = '';
         document.getElementById('v-amount').value = '';
+        document.getElementById('v-code').focus();
+    }
+
+    function removeOne(index) {
+        queue.splice(index, 1);
+        updateAdminList();
+    }
+
+    function clearQueue() {
+        if(confirm("¿Borrar todos los vales de la lista?")) {
+            queue = [];
+            updateAdminList();
+        }
+    }
+
+    function updateAdminList() {
+        const section = document.getElementById('queue-section');
+        const listDiv = document.getElementById('queue-list');
+        const clearBtn = document.getElementById('btn-clear-all');
+        const countLabel = document.getElementById('count-label');
+
+        if(queue.length === 0) {
+            section.classList.add('hidden');
+            clearBtn.classList.add('hidden');
+            return;
+        }
+
+        section.classList.remove('hidden');
+        clearBtn.classList.remove('hidden');
+        countLabel.innerText = `Vales en el paquete: ${queue.length}`;
+        
+        listDiv.innerHTML = queue.map((v, i) => `
+            <div class="queue-item">
+                <span><b>${v.am}€</b> - Cód: ${v.id}</span>
+                <button class="btn-del" onclick="removeOne(${i})">✕</button>
+            </div>
+        `).join('');
     }
 
     function generateFinalLink() {
         const station = document.getElementById('st-name').value.trim() || "Gasolinera";
         const base64 = encodeData({ s: station, v: queue });
         const url = window.location.origin + window.location.pathname + '?d=' + base64;
-        
-        const msg = `⛽ *PAQUETE DE VALES DISPONIBLES*\nEstación: *${station}*\n\nAccede aquí para repartirlos a tus socios:\n${url}`;
-        
-        navigator.clipboard.writeText(msg).then(() => alert("Mensaje para el Distribuidor copiado."));
+        const msg = `⛽ *PAQUETE DE VALES*\nEstación: *${station}*\n\nAccede aquí para repartirlos:\n${url}`;
+        navigator.clipboard.writeText(msg).then(() => alert("¡Mensaje copiado!"));
     }
 
+    // --- FUNCIONES CLIENTE / SOCIO ---
     function renderClientView() {
-        try {
-            const decoded = decodeData(d);
-            document.getElementById('client-station-title').innerText = "📍 " + decoded.s;
-            
-            const lockKey = 'lock_' + btoa(decoded.s).substring(0,8);
-            const locked = JSON.parse(localStorage.getItem(lockKey)) || [];
-            
-            const list = document.getElementById('client-vales-list');
-            list.innerHTML = '';
-
-            decoded.v.forEach(v => {
-                const isLocked = locked.includes(v.id);
-                const div = document.createElement('div');
-                div.className = `vale-item ${isLocked ? 'locked' : ''}`;
-                div.innerHTML = `
-                    <div class="vale-info">
-                        <b>${v.am} €</b>
-                        <small>ID: ${v.id}</small>
-                        ${isLocked ? '<br><span class="badge-locked">ENVIADO</span>' : ''}
-                    </div>
+        const decoded = decodeData(d);
+        document.getElementById('client-station-title').innerText = "📍 " + decoded.s;
+        const lockKey = 'lock_' + btoa(decoded.s).substring(0,8);
+        const locked = JSON.parse(localStorage.getItem(lockKey)) || [];
+        const list = document.getElementById('client-vales-list');
+        list.innerHTML = decoded.v.map(v => {
+            const isLocked = locked.includes(v.id);
+            return `
+                <div class="vale-item ${isLocked ? 'locked' : ''}">
+                    <div class="vale-info"><b>${v.am} €</b><small>ID: ${v.id}</small></div>
                     <button class="btn btn-send-wa" ${isLocked ? 'disabled' : ''} onclick="sendToPartner('${v.id}','${v.am}','${decoded.s}','${lockKey}')">
-                        ${isLocked ? 'LISTO' : 'ENVIAR WA'}
+                        ${isLocked ? 'ENVIADO' : 'ENVIAR WA'}
                     </button>
-                `;
-                list.appendChild(div);
-            });
-        } catch(e) { alert("Error al cargar el paquete."); }
+                </div>
+            `;
+        }).join('');
     }
 
     function sendToPartner(id, am, station, lockKey) {
         const socioData = encodeData({ i: id, a: am, st: station });
         const urlSocio = window.location.origin + window.location.pathname + '?s=' + socioData;
-        
-        const msg = `*VALE DE COMBUSTIBLE* ⛽\n` +
-                    `📍 Estación: *${station}*\n` +
-                    `💰 Importe: *${am}€*\n\n` +
-                    `👇 *ABRE TU CÓDIGO DE BARRAS AQUÍ:* \n` +
-                    `${urlSocio}\n\n` +
-                    `⚠️ *IMPORTANTE:* Si el enlace anterior no aparece en azul, por favor envíame un "OK" o agrégame a tus contactos para activarlo.`;
-        
+        const msg = `*VALE DE COMBUSTIBLE* ⛽\n📍 Estación: *${station}*\n💰 Importe: *${am}€*\n\n👇 *PULSA PARA VER TU CÓDIGO:* \n${urlSocio}\n\n⚠️ Si el enlace no sale azul, responde "OK" para activarlo.`;
         window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
 
         let locked = JSON.parse(localStorage.getItem(lockKey)) || [];
@@ -183,23 +207,14 @@
 
     function showTicketView() {
         document.getElementById('main-app').classList.add('hidden');
-        const ticket = document.getElementById('ticket-view');
-        ticket.style.display = 'block';
-        
+        document.getElementById('ticket-view').style.display = 'block';
         try {
             const data = decodeData(s);
             document.getElementById('ticket-station').innerText = data.st;
             document.getElementById('ticket-amount').innerText = data.a + "€";
             document.getElementById('ticket-code-num').innerText = data.i;
-            
-            JsBarcode("#barcode-full", data.i, {
-                format: "CODE128",
-                width: 3.5,
-                height: 140,
-                displayValue: false,
-                margin: 0
-            });
-        } catch(e) { alert("Error al generar el código"); }
+            JsBarcode("#barcode-full", data.i, { format: "CODE128", width: 3.5, height: 140, displayValue: false });
+        } catch(e) { alert("Error"); }
     }
 </script>
 
