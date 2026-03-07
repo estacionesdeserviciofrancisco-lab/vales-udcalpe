@@ -24,6 +24,7 @@
         .btn-add { background: var(--dark); margin-bottom: 10px; }
         .btn-generate { background: var(--primary); margin-top: 20px; }
         .btn-login { background: var(--primary); margin-top: 10px; }
+        .btn-clear { background: #94a3b8; margin-top: 10px; font-size: 0.7rem; padding: 8px; }
 
         /* LISTA ADMIN */
         .admin-item { 
@@ -71,6 +72,7 @@
                 <p style="font-weight:bold; font-size:0.8rem; margin: 20px 0 10px 0;">VALES EN ESTE PAQUETE:</p>
                 <div id="lista-vales-admin"></div>
                 <button class="btn btn-generate" onclick="copiarEnlace()">COPIAR MENSAJE PARA REPARTO</button>
+                <button class="btn btn-clear" onclick="limpiarTodo()">LIMPIAR TODA LA LISTA</button>
             </div>
         </div>
     </div>
@@ -122,6 +124,15 @@
         if (pass === CLAVE_MAESTRA) {
             document.getElementById('login-screen').classList.add('hidden');
             document.getElementById('admin-panel').classList.remove('hidden');
+            
+            // --- NUEVO: Cargar datos guardados al entrar como Admin ---
+            const guardados = localStorage.getItem('admin_vales_sesion');
+            const gasoGuardada = localStorage.getItem('admin_gasolinera_sesion');
+            if(guardados) {
+                vales = JSON.parse(guardados);
+                if(gasoGuardada) document.getElementById('st-name').value = gasoGuardada;
+                actualizarListaAdmin();
+            }
         } else {
             alert("Contraseña incorrecta");
         }
@@ -132,14 +143,34 @@
         const a = document.getElementById('v-amount').value;
         if(!c || !a) return;
         vales.push({ id: c, am: a });
+        
+        // --- NUEVO: Guardar automáticamente ---
+        guardarEstadoAdmin();
+        
         actualizarListaAdmin();
         document.getElementById('v-code').value = '';
         document.getElementById('v-amount').value = '';
     }
 
     function borrarVale(index) {
-        vales.splice(index, 1);
-        actualizarListaAdmin();
+        if(confirm("¿Borrar este vale?")) {
+            vales.splice(index, 1);
+            guardarEstadoAdmin(); // Guardar tras borrar
+            actualizarListaAdmin();
+        }
+    }
+
+    function limpiarTodo() {
+        if(confirm("¿Estás seguro de que quieres borrar TODA la lista actual?")) {
+            vales = [];
+            localStorage.removeItem('admin_vales_sesion');
+            actualizarListaAdmin();
+        }
+    }
+
+    function guardarEstadoAdmin() {
+        localStorage.setItem('admin_vales_sesion', JSON.stringify(vales));
+        localStorage.setItem('admin_gasolinera_sesion', document.getElementById('st-name').value);
     }
 
     function actualizarListaAdmin() {
@@ -157,51 +188,32 @@
 
     function copiarEnlace() {
         const st = document.getElementById('st-name').value || "Estación";
+        // Guardamos el nombre de la gasolinera por si acaso
+        localStorage.setItem('admin_gasolinera_sesion', st);
+        
         const url = window.location.origin + window.location.pathname + '?d=' + enc({ s: st, v: vales });
         const msg = `⛽ *VALES DISPONIBLES*\nEstación: *${st}*\n\nAcceda aquí para repartirlos:\n${url}`;
         navigator.clipboard.writeText(msg).then(() => alert("¡Enlace de reparto copiado!"));
     }
 
+    // --- EL RESTO DEL CÓDIGO SE MANTIENE IGUAL ---
     function dibujarValesCliente() {
         const data = dec(d);
         document.getElementById('client-title').innerText = "📍 " + data.s;
-        
-        // Clave única para esta estación en el localStorage
         const key = 'l_' + btoa(data.s).substring(0,5);
         const lkd = JSON.parse(localStorage.getItem(key)) || [];
-        
         document.getElementById('lista-vales-cliente').innerHTML = data.v.map(v => {
             const yaEnviado = lkd.includes(v.id);
-            return `
-            <div class="vale-item">
-                <div>
-                    <b style="${yaEnviado ? 'color:#94a3b8' : ''}">${v.am}€</b><br>
-                    <small style="${yaEnviado ? 'color:#94a3b8' : ''}">${v.id}</small>
-                    ${yaEnviado ? '<span class="check-sent">✔</span>' : ''}
-                </div>
-                <button class="btn ${yaEnviado ? 'btn-reenviar' : 'btn-send-wa'}" 
-                    onclick="enviarSocio('${v.id}','${v.am}','${data.s}','${key}')">
-                    ${yaEnviado ? 'REENVIAR' : 'ENVIAR'}
-                </button>
-            </div>`;
+            return `<div class="vale-item"><div><b style="${yaEnviado ? 'color:#94a3b8' : ''}">${v.am}€</b><br><small style="${yaEnviado ? 'color:#94a3b8' : ''}">${v.id}</small>${yaEnviado ? '<span class="check-sent">✔</span>' : ''}</div><button class="btn ${yaEnviado ? 'btn-reenviar' : 'btn-send-wa'}" onclick="enviarSocio('${v.id}','${v.am}','${data.s}','${key}')">${yaEnviado ? 'REENVIAR' : 'ENVIAR'}</button></div>`;
         }).join('');
     }
 
     function enviarSocio(id, am, st, key) {
         const url = window.location.origin + window.location.pathname + '?s=' + enc({ i: id, a: am, st: st });
         const msg = `⛽ *VALE COMBUSTIBLE*\nImporte: *${am}€*\n\n👇 *VER CÓDIGO:* \n${url}\n\n⚠️ Si el link sale negro, respóndeme "OK".`;
-        
-        // Abrir WhatsApp en pestaña nueva
         window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
-        
-        // Registrar envío localmente
         let lkd = JSON.parse(localStorage.getItem(key)) || [];
-        if(!lkd.includes(id)) { 
-            lkd.push(id); 
-            localStorage.setItem(key, JSON.stringify(lkd)); 
-        }
-        
-        // Refrescar la lista para mostrar el cambio de estado
+        if(!lkd.includes(id)) { lkd.push(id); localStorage.setItem(key, JSON.stringify(lkd)); }
         setTimeout(dibujarValesCliente, 1000);
     }
 
@@ -212,15 +224,7 @@
         document.getElementById('t-station').innerText = data.st;
         document.getElementById('t-amount').innerText = data.a + "€";
         document.getElementById('t-code').innerText = data.i;
-        
-        // Generar código de barras
-        JsBarcode("#barcode", data.i, { 
-            format: "CODE128", 
-            width: 3, 
-            height: 100, 
-            displayValue: false,
-            lineColor: "#000"
-        });
+        JsBarcode("#barcode", data.i, { format: "CODE128", width: 3, height: 100, displayValue: false, lineColor: "#000" });
     }
 </script>
 </body>
